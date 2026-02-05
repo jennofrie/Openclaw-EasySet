@@ -1,0 +1,56 @@
+{
+  "name": "openclaw-easyset",
+  "version": "1.0.0",
+  "description": "Automated OpenClaw setup and configuration tool for the community",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "openclaw-easyset": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "npm test -- --watch",
+    "test:coverage": "npm test -- --coverage",
+    "lint": "eslint src tests",
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "openclaw",
+    "automation",
+    "cli",
+    "setup",
+    "configuration",
+    "installer"
+  ],
+  "author": "OpenClaw Community",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.14",
+    "ora": "^8.0.1",
+    "boxen": "^7.1.1",
+    "cli-progress": "^3.12.0",
+    "fs-extra": "^11.2.0",
+    "yaml": "^2.3.4",
+    "axios": "^1.6.7",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.56.0",
+    "@types/node": "^20.11.16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jennofrie/Openclaw-EasySet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jennofrie/Openclaw-EasySet/issues"
+  },
+  "homepage": "https://github.com/jennofrie/Openclaw-EasySet#readme"
+}
