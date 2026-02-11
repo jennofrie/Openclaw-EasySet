@@ -1,313 +1,225 @@
 /**
- * OpenClaw Installation Command
- * Handles installation and configuration of OpenClaw
+ * Install Command - Main installation orchestrator
  * @module commands/install
  */
 
 import chalk from 'chalk';
-import ora from 'ora';
-import inquirer from 'inquirer';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import boxen from 'boxen';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import platformDetector from '../core/platform-detector.js';
-import { executeCommand, commandExists } from '../core/utils.js';
+import pluginManager from '../core/plugin-manager.js';
+import skillManager from '../core/skill-manager.js';
+import gogSetup from '../core/gog-setup.js';
+import { commandExists, createSpinner, executeCommand, printStatus } from '../core/utils.js';
 import logger from '../core/logger.js';
-import { getWorkspaceTemplates } from '../templates/workspace.js';
+
+const OPENCLAW_CONFIG = join(homedir(), '.openclaw', 'openclaw.json');
 
 /**
- * Install command handler
+ * Execute install command
  * @param {Object} options - Command options
  */
 export async function installCommand(options) {
-  logger.info('Starting OpenClaw installation...');
-  
-  const spinner = ora('Detecting platform...').start();
-  
+  const results = {
+    steps: [],
+    success: true,
+  };
+
   try {
-    // Detect platform
-    const platform = await platformDetector.detect();
-    spinner.succeed('Platform detected');
-    
-    // Check requirements
-    if (!platform.requirements.allMet) {
-      spinner.fail('System requirements not met');
-      console.log(chalk.red('\n⚠️  System Requirements Check Failed\n'));
-      
-      if (!platform.requirements.node.met) {
-        console.log(chalk.yellow(`Node.js ${platform.requirements.node.required}+ required`));
-        console.log(`Current version: ${platform.requirements.node.actual}`);
-        console.log(`Download from: ${chalk.cyan('https://nodejs.org')}\n`);
-      }
-      
-      if (!platform.requirements.memory.met) {
-        console.log(chalk.yellow(`Minimum 4GB RAM recommended`));
-        console.log(`Current memory: ${platform.requirements.memory.actual}\n`);
-      }
-      
-      if (!options.force) {
-        console.log(chalk.gray('Use --force to install anyway (not recommended)'));
-        process.exit(1);
-      }
-    }
-    
-    // Interactive prompts (unless --yes flag)
-    let config = {
-      instanceName: 'profexor',
-      emoji: '🦾',
-      mode: options.mode || 'auto',
-      channels: {
-        telegram: false,
-        whatsapp: false,
-        webchat: true
-      }
-    };
-    
-    if (!options.yes) {
-      config = await promptConfiguration(platform, options);
-    }
-    
-    // Dry run mode
+    console.log(boxen(chalk.bold.blue('OpenClaw EasySet - Installation'), {
+      padding: 1,
+      margin: 1,
+      borderStyle: 'round',
+    }));
+
     if (options.dryRun) {
-      console.log(chalk.cyan('\n🔍 Dry Run Mode - No changes will be made\n'));
-      printInstallationPlan(platform, config);
-      return;
+      console.log(chalk.yellow('  Running in dry-run mode - no changes will be made\n'));
     }
-    
-    // Execute installation
-    await executeInstallation(platform, config, options);
-    
-    console.log(chalk.green('\n✅ OpenClaw installation complete!\n'));
-    printNextSteps(platform, config);
-    
+
+    // Step 1: Platform Detection
+    console.log(chalk.bold.underline('\nStep 1/7: Platform Detection\n'));
+    const platformResult = await runStep('Platform Detection', async () => {
+      const platformInfo = await platformDetector.detect();
+      platformDetector.printSummary();
+      return { status: 'success', platformInfo };
+    });
+    results.steps.push(platformResult);
+
+    const platformInfo = platformResult.data?.platformInfo;
+
+    // Step 2: Check Existing Installation
+    console.log(chalk.bold.underline('\nStep 2/7: Check Existing Installation\n'));
+    const checkResult = await runStep('Check Existing', async () => {
+      const openclawInstalled = await commandExists('openclaw');
+      const configExists = existsSync(OPENCLAW_CONFIG);
+
+      if (openclawInstalled) {
+        printStatus('success', 'OpenClaw CLI is installed');
+      } else {
+        printStatus('warn', 'OpenClaw CLI not found');
+      }
+
+      if (configExists) {
+        printStatus('success', 'OpenClaw config exists');
+      } else {
+        printStatus('warn', 'OpenClaw config not found');
+      }
+
+      return { status: 'success', openclawInstalled, configExists };
+    });
+    results.steps.push(checkResult);
+
+    // Step 3: Install OpenClaw
+    console.log(chalk.bold.underline('\nStep 3/7: Install OpenClaw\n'));
+    const installResult = await runStep('Install OpenClaw', async () => {
+      if (checkResult.data?.openclawInstalled) {
+        console.log(chalk.green('  OpenClaw already installed, skipping'));
+        return { status: 'skipped', reason: 'already-installed' };
+      }
+
+      if (options.dryRun) {
+        console.log(chalk.gray('  [dry-run] Would run: npm install -g openclaw@latest'));
+        return { status: 'dry-run' };
+      }
+
+      const spinner = createSpinner('Installing OpenClaw...');
+      spinner.start();
+
+      try {
+        await executeCommand('npm install -g openclaw@latest');
+        spinner.succeed('OpenClaw installed successfully');
+        return { status: 'success' };
+      } catch (error) {
+        spinner.fail('OpenClaw installation failed');
+        logger.warn(`Install failed: ${error.message}`);
+        console.log(chalk.yellow('  You can install manually: npm install -g openclaw@latest'));
+        return { status: 'failed', error: error.message };
+      }
+    });
+    results.steps.push(installResult);
+
+    // Step 4: Plugin Setup Wizard
+    console.log(chalk.bold.underline('\nStep 4/7: Plugin Configuration\n'));
+    const pluginResult = await runStep('Plugin Setup', async () => {
+      const wizardResult = await pluginManager.runPluginWizard({
+        yes: options.yes,
+        dryRun: options.dryRun,
+      });
+      return { status: 'success', ...wizardResult };
+    });
+    results.steps.push(pluginResult);
+
+    // Step 5: GOG CLI Setup
+    console.log(chalk.bold.underline('\nStep 5/7: Google Workspace (gog) Setup\n'));
+    const gogResult = await runStep('GOG Setup', async () => {
+      const setupResult = await gogSetup.runSetup(platformInfo, {
+        yes: options.yes,
+        dryRun: options.dryRun,
+      });
+      return { status: setupResult.status, ...setupResult };
+    });
+    results.steps.push(gogResult);
+
+    // Step 6: Skills Selection
+    console.log(chalk.bold.underline('\nStep 6/7: Skills Selection\n'));
+    const skillResult = await runStep('Skills Selection', async () => {
+      const wizardResult = await skillManager.runSkillWizard({
+        yes: options.yes,
+        dryRun: options.dryRun,
+      });
+      return { status: 'success', ...wizardResult };
+    });
+    results.steps.push(skillResult);
+
+    // Step 7: Final Validation
+    console.log(chalk.bold.underline('\nStep 7/7: Final Validation\n'));
+    const validationResult = await runStep('Validation', async () => {
+      const checks = [];
+
+      // Verify config is valid JSON
+      if (existsSync(OPENCLAW_CONFIG) && !options.dryRun) {
+        try {
+          const { readFileSync } = await import('fs');
+          JSON.parse(readFileSync(OPENCLAW_CONFIG, 'utf-8'));
+          checks.push({ name: 'Config valid JSON', passed: true });
+          printStatus('success', 'openclaw.json is valid JSON');
+        } catch {
+          checks.push({ name: 'Config valid JSON', passed: false });
+          printStatus('error', 'openclaw.json is NOT valid JSON');
+        }
+      }
+
+      // Check OpenClaw command
+      const clawExists = await commandExists('openclaw');
+      checks.push({ name: 'OpenClaw CLI', passed: clawExists });
+      printStatus(clawExists ? 'success' : 'warn', `OpenClaw CLI: ${clawExists ? 'available' : 'not found'}`);
+
+      // Check gog
+      const gogExists = await commandExists('gog');
+      checks.push({ name: 'gog CLI', passed: gogExists });
+      printStatus(gogExists ? 'success' : 'info', `gog CLI: ${gogExists ? 'available' : 'not found'}`);
+
+      return { status: 'success', checks };
+    });
+    results.steps.push(validationResult);
+
+    // Print final summary
+    printFinalSummary(results, options);
+
   } catch (error) {
-    spinner.fail('Installation failed');
-    logger.error('Installation error', error);
-    console.log(chalk.red(`\n❌ Error: ${error.message}\n`));
+    logger.error('Installation failed', error);
+    console.log(chalk.red(`\nInstallation failed: ${error.message}`));
     process.exit(1);
   }
 }
 
 /**
- * Prompt user for configuration
- * @param {Object} platform - Platform information
- * @param {Object} options - Command options
- * @returns {Promise<Object>} Configuration
+ * Run a step with error handling (failures are non-fatal)
+ * @param {string} name - Step name
+ * @param {Function} fn - Async function to run
+ * @returns {Promise<Object>} Step result
  */
-async function promptConfiguration(platform, options) {
-  console.log(chalk.cyan('\n🔧 OpenClaw Configuration Wizard\n'));
-  
-  const questions = [
-    {
-      type: 'input',
-      name: 'instanceName',
-      message: 'Instance name (e.g., profexor, tokyoneon):',
-      default: platform.os.isWindows ? 'tokyoneon' : 'profexor',
-      validate: (input) => {
-        if (!input || input.trim().length === 0) {
-          return 'Instance name is required';
-        }
-        if (!/^[a-z0-9-]+$/i.test(input)) {
-          return 'Only letters, numbers, and hyphens allowed';
-        }
-        return true;
-      }
-    },
-    {
-      type: 'input',
-      name: 'emoji',
-      message: 'Instance emoji:',
-      default: (answers) => {
-        const emojiMap = {
-          profexor: '🦾',
-          tokyoneon: '🌃',
-          forge: '🔥'
-        };
-        return emojiMap[answers.instanceName.toLowerCase()] || '🦞';
-      }
-    },
-    {
-      type: 'list',
-      name: 'mode',
-      message: 'Installation mode:',
-      choices: [
-        { name: 'Native (recommended)', value: 'native' },
-        { name: 'Docker', value: 'docker' },
-        { name: 'Auto-detect', value: 'auto' }
-      ],
-      default: 'native'
-    },
-    {
-      type: 'checkbox',
-      name: 'channels',
-      message: 'Select communication channels:',
-      choices: [
-        { name: 'Telegram', value: 'telegram', checked: true },
-        { name: 'WhatsApp (for brainstorming)', value: 'whatsapp', checked: false },
-        { name: 'Webchat', value: 'webchat', checked: true },
-        ...(platform.os.isMacOS ? [{ name: 'iMessage (macOS only)', value: 'imessage', checked: false }] : [])
-      ]
-    }
-  ];
-  
-  const answers = await inquirer.prompt(questions);
-  
-  // Convert channels array to object
-  const channels = {
-    telegram: answers.channels.includes('telegram'),
-    whatsapp: answers.channels.includes('whatsapp'),
-    webchat: answers.channels.includes('webchat'),
-    imessage: answers.channels.includes('imessage')
-  };
-  
-  return {
-    instanceName: answers.instanceName,
-    emoji: answers.emoji,
-    mode: answers.mode,
-    channels
-  };
-}
-
-/**
- * Print installation plan
- * @param {Object} platform - Platform information
- * @param {Object} config - Configuration
- */
-function printInstallationPlan(platform, config) {
-  console.log(chalk.bold('Installation Plan:\n'));
-  console.log(`Instance Name: ${chalk.cyan(config.instanceName)} ${config.emoji}`);
-  console.log(`Platform:      ${chalk.cyan(platform.os.name)}`);
-  console.log(`Mode:          ${chalk.cyan(config.mode)}`);
-  console.log(`Channels:      ${Object.entries(config.channels)
-    .filter(([_, enabled]) => enabled)
-    .map(([name]) => chalk.cyan(name))
-    .join(', ')}`);
-  
-  console.log(chalk.bold('\nSteps:\n'));
-  console.log('1. Install OpenClaw globally (npm install -g openclaw)');
-  console.log('2. Create workspace directory');
-  console.log('3. Generate identity files (SOUL.md, IDENTITY.md, etc.)');
-  console.log('4. Initialize git repository');
-  console.log('5. Configure gateway settings');
-  console.log('6. Display next steps (API keys, channel setup)');
-}
-
-/**
- * Execute installation
- * @param {Object} platform - Platform information
- * @param {Object} config - Configuration
- * @param {Object} options - Command options
- */
-async function executeInstallation(platform, config, options) {
-  const spinner = ora('Installing OpenClaw...').start();
-  
+async function runStep(name, fn) {
   try {
-    // Step 1: Install OpenClaw CLI
-    spinner.text = 'Installing OpenClaw CLI (npm install -g openclaw)...';
-    if (!options.skipNpm) {
-      const openclawExists = await commandExists('openclaw');
-      if (!openclawExists) {
-        await executeCommand('npm install -g openclaw');
-        spinner.succeed('OpenClaw CLI installed');
-      } else {
-        spinner.info('OpenClaw CLI already installed');
-      }
-    } else {
-      spinner.info('Skipping npm installation (--skip-npm)');
-    }
-    
-    // Step 2: Create workspace directory
-    spinner.start('Creating workspace directory...');
-    const workspacePath = join(homedir(), '.openclaw', 'workspace');
-    if (!existsSync(workspacePath)) {
-      mkdirSync(workspacePath, { recursive: true });
-    }
-    
-    // Create subdirectories
-    const subdirs = ['memory', 'projects', 'brainstorms'];
-    subdirs.forEach(dir => {
-      const dirPath = join(workspacePath, dir);
-      if (!existsSync(dirPath)) {
-        mkdirSync(dirPath, { recursive: true });
-      }
-    });
-    spinner.succeed('Workspace directory created');
-    
-    // Step 3: Generate identity files
-    spinner.start('Generating identity files...');
-    const templates = getWorkspaceTemplates(config.instanceName, config.emoji, platform.os.isWindows);
-    
-    Object.entries(templates).forEach(([filename, content]) => {
-      const filePath = join(workspacePath, filename);
-      writeFileSync(filePath, content, 'utf-8');
-    });
-    spinner.succeed('Identity files created');
-    
-    // Step 4: Initialize git
-    spinner.start('Initializing git repository...');
-    try {
-      await executeCommand('git init', { cwd: workspacePath });
-      await executeCommand('git add .', { cwd: workspacePath });
-      await executeCommand(`git commit -m "Initial ${config.instanceName} workspace setup"`, { cwd: workspacePath });
-      spinner.succeed('Git repository initialized');
-    } catch (error) {
-      spinner.warn('Git initialization skipped (git not found or already initialized)');
-    }
-    
-    // Step 5: Display configuration template
-    spinner.succeed('Installation complete');
-    
+    const data = await fn();
+    return { name, success: true, data };
   } catch (error) {
-    spinner.fail('Installation failed');
-    throw error;
+    logger.warn(`Step "${name}" failed: ${error.message}`);
+    console.log(chalk.yellow(`  Warning: ${name} encountered an error: ${error.message}`));
+    return { name, success: false, error: error.message, data: null };
   }
 }
 
 /**
- * Print next steps
- * @param {Object} platform - Platform information
- * @param {Object} config - Configuration
+ * Print the final installation summary
+ * @param {Object} results - All step results
+ * @param {Object} options - CLI options
  */
-function printNextSteps(platform, config) {
-  console.log(chalk.bold('📋 Next Steps:\n'));
-  
-  console.log(chalk.yellow('1. Add your Anthropic API key:'));
-  console.log(chalk.gray('   Set environment variable or add to gateway config'));
-  console.log(chalk.gray(`   export ANTHROPIC_API_KEY="sk-ant-..."\n`));
-  
-  if (config.channels.telegram) {
-    console.log(chalk.yellow('2. Configure Telegram:'));
-    console.log(chalk.gray('   - Create bot via @BotFather'));
-    console.log(chalk.gray('   - Get bot token'));
-    console.log(chalk.gray('   - Get your chat ID (send message, check /getUpdates)'));
-    console.log(chalk.gray('   - Add to gateway config\n'));
+function printFinalSummary(results, options) {
+  const lines = [chalk.bold('Installation Summary')];
+
+  if (options.dryRun) {
+    lines.push(chalk.yellow('(Dry Run - no changes were made)'));
   }
-  
-  if (config.channels.whatsapp) {
-    console.log(chalk.yellow('3. Configure WhatsApp:'));
-    console.log(chalk.gray('   - Setup will be provided by Jin'));
-    console.log(chalk.gray('   - Used for brainstorming between instances\n'));
+
+  lines.push('');
+
+  for (const step of results.steps) {
+    const icon = step.success ? chalk.green('✓') : chalk.yellow('⚠');
+    const status = step.data?.status || (step.success ? 'done' : 'warning');
+    lines.push(`${icon} ${step.name}: ${status}`);
   }
-  
-  console.log(chalk.yellow('4. Start OpenClaw gateway:'));
-  console.log(chalk.cyan('   openclaw gateway start\n'));
-  
-  console.log(chalk.yellow('5. Test your instance:'));
-  if (config.channels.webchat) {
-    console.log(chalk.cyan('   Visit: http://localhost:3000'));
+
+  console.log('\n' + boxen(lines.join('\n'), {
+    padding: 1,
+    margin: 1,
+    borderStyle: 'round',
+    borderColor: 'green',
+  }));
+
+  if (!options.dryRun) {
+    console.log(chalk.gray('  Run "openclaw-easyset configure" to modify settings later.'));
   }
-  if (config.channels.telegram) {
-    console.log(chalk.gray('   Send a message to your Telegram bot'));
-  }
-  
-  console.log(chalk.yellow('\n6. Create private GitHub repository:'));
-  console.log(chalk.gray(`   cd ~/.openclaw/workspace`));
-  console.log(chalk.gray(`   git remote add origin https://github.com/yourusername/${config.instanceName}-workspace.git`));
-  console.log(chalk.gray(`   git push -u origin main\n`));
-  
-  console.log(chalk.bold('📚 Documentation:\n'));
-  console.log(chalk.cyan('   https://docs.openclaw.ai'));
-  console.log(chalk.cyan('   https://github.com/openclaw/openclaw\n'));
-  
-  console.log(chalk.green(`🌟 Welcome to OpenClaw, ${config.instanceName}! ${config.emoji}\n`));
 }

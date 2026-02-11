@@ -1,7 +1,7 @@
 export default {
   testEnvironment: 'node',
   transform: {},
-  extensionsToTreatAsEsm: ['.js'],
+  // extensionsToTreatAsEsm not needed - package.json "type": "module" handles this
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
