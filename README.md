@@ -1,126 +1,25 @@
-# OpenClaw EasySet 🦞🚀
+# OpenClaw EasySet
 
-> **Automated OpenClaw setup and configuration tool for the community**
+> **Automated OpenClaw setup, configuration, and health monitoring CLI**
 
-OpenClaw EasySet is a robust, user-friendly CLI automation tool designed to streamline the installation and configuration of OpenClaw. It eliminates manual setup complexity by providing one-command installation, multi-platform support, and intelligent configuration wizards.
-
----
-
-## ✨ Features
-
-- **🔍 Platform Detection** - Automatically detects OS, architecture, and system capabilities
-- **📦 Automated Installation** - One-command setup for all dependencies (Coming in Phase 2)
-- **🖥️ Multi-Platform Support** - macOS, Linux, Windows compatibility
-- **🐳 Dual Deployment** - Native or Docker installation options
-- **🧙 Interactive Wizards** - Guided configuration with intelligent defaults
-- **✅ Safety Features** - Dry-run mode, backups, and rollback capabilities
-- **📊 Health Checks** - Comprehensive system diagnostics
+OpenClaw EasySet replaces manual configuration editing with interactive wizards, automated health checks, and a live status dashboard. Instead of hand-editing `openclaw.json`, running `launchctl` commands, and manually verifying services, EasySet handles it all through a single CLI.
 
 ---
 
-## 🚀 Quick Start
+## What It Does
 
-### Installation
-
-```bash
-npm install -g openclaw-easyset
-```
-
-### Check Your System
-
-```bash
-openclaw-easyset detect --recommendations
-```
+| Manual Way | EasySet Way |
+|-----------|-------------|
+| Edit `~/.openclaw/openclaw.json` by hand | `openclaw-easyset configure plugins` |
+| Check if gateway is running with `launchctl list \| grep openclaw` | `openclaw-easyset status` |
+| Debug why things aren't working | `openclaw-easyset doctor --fix` |
+| Remember to backup before changes | `openclaw-easyset backup create` |
+| Install and configure gog CLI manually | `openclaw-easyset install` (guided) |
+| Find and enable workspace skills | `openclaw-easyset configure skills` |
 
 ---
 
-## 📋 System Requirements
-
-- **Node.js**: v18.0.0 or higher
-- **Memory**: 4GB RAM minimum
-- **Disk Space**: 1GB free space
-- **OS**: macOS, Linux, or Windows (with WSL2)
-
----
-
-## 🎯 Current Status
-
-### ✅ Phase 1: Foundation (COMPLETE)
-
-- [x] Platform detection (OS, architecture, system capabilities)
-- [x] Logging system (Winston-based)
-- [x] Configuration management
-- [x] Core utilities
-- [x] CLI framework (Commander.js)
-- [x] Testing infrastructure (Jest)
-- [x] Project documentation
-
-### 🚧 Phase 2: Installation (Coming Soon)
-
-- [ ] Dependency manager
-- [ ] Native installation flow
-- [ ] Docker installation flow
-- [ ] Configuration wizard
-- [ ] Service management
-
-### 📅 Phase 3: Advanced Features (Planned)
-
-- [ ] Multi-terminal execution
-- [ ] Skills marketplace integration
-- [ ] Security hardening
-- [ ] Backup & restore
-
----
-
-## 💻 Usage
-
-### Detect Platform
-
-Check your system capabilities and get installation recommendations:
-
-```bash
-openclaw-easyset detect --recommendations
-```
-
-Output as JSON:
-
-```bash
-openclaw-easyset detect --json
-```
-
-### Install OpenClaw (Coming in Phase 2)
-
-```bash
-# Interactive installation
-openclaw-easyset install
-
-# Non-interactive with config file
-openclaw-easyset install --config my-setup.json --yes
-
-# Dry-run to preview changes
-openclaw-easyset install --dry-run --verbose
-
-# Docker installation
-openclaw-easyset install --mode docker
-```
-
-### Check Status (Coming in Phase 2)
-
-```bash
-openclaw-easyset status --detailed
-```
-
-### Health Check (Coming in Phase 3)
-
-```bash
-openclaw-easyset doctor --fix
-```
-
----
-
-## 🧪 Development
-
-### Setup
+## Installation
 
 ```bash
 git clone https://github.com/jennofrie/Openclaw-EasySet.git
@@ -128,108 +27,194 @@ cd Openclaw-EasySet
 npm install
 ```
 
-### Run Tests
+Run directly:
 
 ```bash
-npm test
+node src/index.js <command>
 ```
 
-### Run with Debug Logging
+Or link globally:
 
 ```bash
-npm start -- detect --debug
+npm link
+openclaw-easyset <command>
 ```
 
 ---
 
-## 📚 Documentation
+## Commands
 
-Comprehensive planning documentation is available in the `.planning/` directory:
+### `detect` - System Detection
 
-- **[Implementation Plan](. planning/implementation-plan.md)** - Complete technical specifications
-- **[Testing Guide](.planning/testing-guide.md)** - Testing methodology and safety protocols
-- **[Delivery Summary](.planning/delivery-summary.md)** - Project deliverables overview
+Detect OS, architecture, Node.js, memory, installed tools, and package managers.
+
+```bash
+openclaw-easyset detect
+openclaw-easyset detect --recommendations
+openclaw-easyset detect --json
+```
+
+### `install` - Guided Installation
+
+7-step guided installer: platform detection, OpenClaw install, plugin configuration (Memory LanceDB, LLM Task), Google Workspace CLI setup, skills discovery, and validation.
+
+```bash
+openclaw-easyset install              # Interactive wizard
+openclaw-easyset install --dry-run    # Preview without changes
+openclaw-easyset install --yes        # Accept all defaults
+```
+
+### `configure [section]` - Configuration Wizard
+
+Reconfigure individual subsystems after installation.
+
+```bash
+openclaw-easyset configure            # Interactive menu
+openclaw-easyset configure plugins    # Plugin setup (LanceDB, LLM Task)
+openclaw-easyset configure skills     # Discover and enable workspace skills
+openclaw-easyset configure gog        # Google Workspace CLI setup
+```
+
+### `doctor` - Health Checks
+
+Runs 20+ diagnostics across configuration, services, connectivity, storage, security, and tools. Returns a health score and actionable fix suggestions.
+
+```bash
+openclaw-easyset doctor               # Run all checks
+openclaw-easyset doctor --fix         # Auto-fix common issues
+openclaw-easyset doctor --json        # Machine-readable output
+```
+
+Checks include:
+- Config valid JSON, agent model, plugins, channels, gateway
+- LaunchD services running (gateway, gmail-watch)
+- Gateway HTTP health on port 18789
+- Memory database and vector store status
+- File permissions on sensitive configs (.env, openclaw.json)
+- Auth profiles and gateway token strength
+- Required tools (openclaw, node, npm) and optional tools (gog, imsg, git)
+- Disk space and log file sizes
+
+### `status` - Live Dashboard
+
+Real-time view of your OpenClaw installation: version, agent config, channels, plugins, services, cron jobs, and storage.
+
+```bash
+openclaw-easyset status
+openclaw-easyset status --detailed    # Include tool versions
+openclaw-easyset status --json
+```
+
+### `backup [action]` - Config Backup & Restore
+
+Create, list, and restore full configuration backups (openclaw.json, .env, credentials, cron jobs).
+
+```bash
+openclaw-easyset backup create                  # Create timestamped backup
+openclaw-easyset backup create --label "stable" # With label
+openclaw-easyset backup list                    # List all backups
+openclaw-easyset backup restore                 # Interactive restore
+```
+
+Safety: restore always creates a pre-restore safety backup first.
 
 ---
 
-## 🛠️ Project Structure
+## System Requirements
+
+- **Node.js**: v18.0.0+
+- **Memory**: 4GB RAM minimum
+- **OS**: macOS (primary), Linux, Windows (WSL2)
+
+---
+
+## Project Structure
 
 ```
-openclaw-easyset/
-├── src/
-│   ├── commands/           # CLI commands
-│   │   └── detect.js       # Platform detection command
-│   ├── core/              # Core modules
-│   │   ├── platform-detector.js
-│   │   ├── logger.js
-│   │   ├── config.js
-│   │   └── utils.js
-│   └── index.js           # Main CLI entry point
-├── tests/                 # Jest tests
-│   └── platform-detector.test.js
-├── .planning/             # Planning documents
-│   ├── implementation-plan.md
-│   ├── testing-guide.md
-│   └── delivery-summary.md
-├── package.json
-└── README.md
+src/
+  index.js                  # CLI entry point (6 commands)
+  commands/
+    detect.js               # Platform detection
+    install.js              # 7-step guided installer
+    configure.js            # Subsystem configuration
+    doctor.js               # Health checks + auto-fix
+    status.js               # Live status dashboard
+    backup.js               # Backup create/list/restore
+  core/
+    platform-detector.js    # OS, arch, tools, package managers
+    plugin-manager.js       # openclaw.json plugin config
+    skill-manager.js        # Workspace skill discovery
+    gog-setup.js            # Google Workspace CLI
+    service-manager.js      # LaunchD service control
+    health-checker.js       # 20+ diagnostic checks
+    backup-manager.js       # Config backup & restore
+    config.js               # EasySet's own config
+    logger.js               # Winston logging
+    utils.js                # Shared utilities
+tests/
+  platform-detector.test.js # Unit tests
 ```
 
 ---
 
-## 🔧 Technologies
+## Development
+
+```bash
+npm install           # Install dependencies
+npm test              # Run tests
+npm start -- detect   # Run CLI
+npm run dev           # Watch mode
+```
+
+Debug logging:
+
+```bash
+node src/index.js doctor --debug
+```
+
+---
+
+## Current Status
+
+### Phase 1: Foundation - Complete
+- Platform detection (OS, architecture, system capabilities)
+- Logging system (Winston), configuration management, core utilities
+- CLI framework (Commander.js), testing infrastructure (Jest)
+
+### Phase 2: Installation & Configuration - Complete
+- Plugin wizard (Memory LanceDB, LLM Task) with config backup
+- Skill discovery from `~/.openclaw/workspace/skills/`
+- Google Workspace (gog) CLI setup with OAuth flow
+- 7-step guided installer with `--dry-run` and `--yes`
+- Subsystem configuration (`configure plugins/skills/gog`)
+
+### Phase 3: Monitoring & Maintenance - Complete
+- Doctor command with 20+ health checks and auto-fix
+- Status dashboard with live service/channel/plugin state
+- Service manager for launchd (gateway, gmail-watch)
+- Config backup and restore with safety backups
+- Security checks (file permissions, token strength)
+
+### Planned
+- Docker container management
+- Multi-terminal execution
+
+---
+
+## Technologies
 
 - **Runtime**: Node.js v18+
-- **CLI Framework**: Commander.js
+- **CLI**: Commander.js
 - **UI**: Inquirer, Chalk, Ora, Boxen
 - **Logging**: Winston
 - **Testing**: Jest
-- **Config**: YAML, JSON
 
 ---
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+MIT - see [LICENSE](LICENSE)
 
 ---
 
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Credits
-
-**Developed by:** OpenClaw Community  
-**Built with** 🦾 **by** Profexor
-
-Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem.
-
----
-
-## 📞 Support
-
-- **GitHub Issues**: [Report bugs or request features](https://github.com/jennofrie/Openclaw-EasySet/issues)
-- **OpenClaw Discord**: [Join the community](https://discord.com/invite/clawd)
-- **Documentation**: [docs.openclaw.ai](https://docs.openclaw.ai)
-
----
-
-## 🗺️ Roadmap
-
-- **Phase 1** (✅ Complete): Foundation & Platform Detection
-- **Phase 2** (In Progress): Installation & Configuration
-- **Phase 3** (Planned): Advanced Features & Community Tools
-- **Phase 4** (Future): Plugin Marketplace & Templates
-
----
-
-**Let's make OpenClaw installation effortless! 🦞💙**
+**Built by** Profexor | Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem

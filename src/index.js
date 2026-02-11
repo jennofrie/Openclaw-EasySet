@@ -10,6 +10,9 @@ import chalk from 'chalk';
 import { detectCommand } from './commands/detect.js';
 import { installCommand } from './commands/install.js';
 import { configureCommand } from './commands/configure.js';
+import { doctorCommand } from './commands/doctor.js';
+import { statusCommand } from './commands/status.js';
+import { backupCommand } from './commands/backup.js';
 import logger from './core/logger.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -51,7 +54,7 @@ program
 // Install command
 program
   .command('install')
-  .description('Install and configure OpenClaw')
+  .description('Install and configure OpenClaw with guided wizard')
   .option('-m, --mode <type>', 'Installation mode (native|docker|auto)', 'auto')
   .option('--dry-run', 'Simulate installation without making changes')
   .option('--yes', 'Accept all defaults')
@@ -65,21 +68,29 @@ program
   .option('--yes', 'Accept all defaults')
   .action(configureCommand);
 
-// Doctor command (placeholder)
+// Doctor command
 program
   .command('doctor')
-  .description('Check installation health')
-  .action(() => {
-    console.log(chalk.yellow('⚠️  Doctor command coming in Phase 3'));
-  });
+  .description('Run comprehensive health checks and diagnostics')
+  .option('--fix', 'Auto-fix common issues')
+  .option('--json', 'Output results as JSON')
+  .action(doctorCommand);
 
-// Status command (placeholder)
+// Status command
 program
   .command('status')
-  .description('Check OpenClaw status')
-  .action(() => {
-    console.log(chalk.yellow('⚠️  Status command coming in Phase 2'));
-  });
+  .description('Show OpenClaw status dashboard')
+  .option('-d, --detailed', 'Show detailed status including tools')
+  .option('--json', 'Output as JSON')
+  .action(statusCommand);
+
+// Backup command
+program
+  .command('backup [action]')
+  .description('Manage config backups (actions: create, list, restore)')
+  .option('-l, --label <label>', 'Label for the backup')
+  .option('-n, --name <name>', 'Backup name (for restore)')
+  .action(backupCommand);
 
 // Parse arguments
 program.parse(process.argv);
