@@ -12,10 +12,12 @@ import platformDetector from '../core/platform-detector.js';
 import pluginManager from '../core/plugin-manager.js';
 import skillManager from '../core/skill-manager.js';
 import gogSetup from '../core/gog-setup.js';
-import { commandExists, createSpinner, executeCommand, printStatus } from '../core/utils.js';
+import channelSetup from '../core/channel-setup.js';
+import { commandExists, createSpinner, executeCommand, executeInteractiveCommand, printStatus } from '../core/utils.js';
 import logger from '../core/logger.js';
 
 const OPENCLAW_CONFIG = join(homedir(), '.openclaw', 'openclaw.json');
+const TOTAL_STEPS = 9;
 
 /**
  * Execute install command
@@ -39,7 +41,7 @@ export async function installCommand(options) {
     }
 
     // Step 1: Platform Detection
-    console.log(chalk.bold.underline('\nStep 1/7: Platform Detection\n'));
+    console.log(chalk.bold.underline(`\nStep 1/${TOTAL_STEPS}: Platform Detection\n`));
     const platformResult = await runStep('Platform Detection', async () => {
       const platformInfo = await platformDetector.detect();
       platformDetector.printSummary();
@@ -50,7 +52,7 @@ export async function installCommand(options) {
     const platformInfo = platformResult.data?.platformInfo;
 
     // Step 2: Check Existing Installation
-    console.log(chalk.bold.underline('\nStep 2/7: Check Existing Installation\n'));
+    console.log(chalk.bold.underline(`\nStep 2/${TOTAL_STEPS}: Check Existing Installation\n`));
     const checkResult = await runStep('Check Existing', async () => {
       const openclawInstalled = await commandExists('openclaw');
       const configExists = existsSync(OPENCLAW_CONFIG);
@@ -72,7 +74,7 @@ export async function installCommand(options) {
     results.steps.push(checkResult);
 
     // Step 3: Install OpenClaw
-    console.log(chalk.bold.underline('\nStep 3/7: Install OpenClaw\n'));
+    console.log(chalk.bold.underline(`\nStep 3/${TOTAL_STEPS}: Install OpenClaw\n`));
     const installResult = await runStep('Install OpenClaw', async () => {
       if (checkResult.data?.openclawInstalled) {
         console.log(chalk.green('  OpenClaw already installed, skipping'));
@@ -100,8 +102,47 @@ export async function installCommand(options) {
     });
     results.steps.push(installResult);
 
-    // Step 4: Plugin Setup Wizard
-    console.log(chalk.bold.underline('\nStep 4/7: Plugin Configuration\n'));
+    // Step 4: OpenClaw Onboarding (the critical missing piece)
+    console.log(chalk.bold.underline(`\nStep 4/${TOTAL_STEPS}: OpenClaw Onboarding\n`));
+    const onboardResult = await runStep('Onboarding', async () => {
+      const openclawReady = await commandExists('openclaw');
+      const configExists = existsSync(OPENCLAW_CONFIG);
+
+      if (!openclawReady) {
+        console.log(chalk.yellow('  OpenClaw CLI not available, skipping onboarding'));
+        return { status: 'skipped', reason: 'openclaw-not-found' };
+      }
+
+      if (configExists) {
+        console.log(chalk.green('  OpenClaw config already exists'));
+        console.log(chalk.gray('  Skipping onboarding wizard (already configured)'));
+        return { status: 'skipped', reason: 'already-onboarded' };
+      }
+
+      if (options.dryRun) {
+        console.log(chalk.gray('  [dry-run] Would run: openclaw onboard --install-daemon'));
+        return { status: 'dry-run' };
+      }
+
+      console.log(chalk.bold('  Running OpenClaw onboarding wizard...'));
+      console.log(chalk.gray('  This sets up your LLM provider, API keys, and daemon.\n'));
+
+      try {
+        // Run onboard interactively so the user can complete the wizard
+        await executeInteractiveCommand('openclaw onboard --install-daemon');
+        console.log(chalk.green('\n  Onboarding complete'));
+        return { status: 'success' };
+      } catch (error) {
+        logger.warn(`Onboard failed: ${error.message}`);
+        console.log(chalk.yellow('  Onboarding failed. You can run it manually:'));
+        console.log(chalk.gray('    openclaw onboard --install-daemon'));
+        return { status: 'failed', error: error.message };
+      }
+    });
+    results.steps.push(onboardResult);
+
+    // Step 5: Plugin Setup Wizard
+    console.log(chalk.bold.underline(`\nStep 5/${TOTAL_STEPS}: Plugin Configuration\n`));
     const pluginResult = await runStep('Plugin Setup', async () => {
       const wizardResult = await pluginManager.runPluginWizard({
         yes: options.yes,
@@ -111,8 +152,8 @@ export async function installCommand(options) {
     });
     results.steps.push(pluginResult);
 
-    // Step 5: GOG CLI Setup
-    console.log(chalk.bold.underline('\nStep 5/7: Google Workspace (gog) Setup\n'));
+    // Step 6: GOG CLI Setup
+    console.log(chalk.bold.underline(`\nStep 6/${TOTAL_STEPS}: Google Workspace (gog) Setup\n`));
     const gogResult = await runStep('GOG Setup', async () => {
       const setupResult = await gogSetup.runSetup(platformInfo, {
         yes: options.yes,
@@ -122,8 +163,19 @@ export async function installCommand(options) {
     });
     results.steps.push(gogResult);
 
-    // Step 6: Skills Selection
-    console.log(chalk.bold.underline('\nStep 6/7: Skills Selection\n'));
+    // Step 7: Channel Setup (the other critical missing piece)
+    console.log(chalk.bold.underline(`\nStep 7/${TOTAL_STEPS}: Channel Configuration\n`));
+    const channelResult = await runStep('Channel Setup', async () => {
+      const setupResult = await channelSetup.runSetup({
+        yes: options.yes,
+        dryRun: options.dryRun,
+      });
+      return { status: 'success', ...setupResult };
+    });
+    results.steps.push(channelResult);
+
+    // Step 8: Skills Selection
+    console.log(chalk.bold.underline(`\nStep 8/${TOTAL_STEPS}: Skills Selection\n`));
     const skillResult = await runStep('Skills Selection', async () => {
       const wizardResult = await skillManager.runSkillWizard({
         yes: options.yes,
@@ -133,8 +185,8 @@ export async function installCommand(options) {
     });
     results.steps.push(skillResult);
 
-    // Step 7: Final Validation
-    console.log(chalk.bold.underline('\nStep 7/7: Final Validation\n'));
+    // Step 9: Final Validation
+    console.log(chalk.bold.underline(`\nStep 9/${TOTAL_STEPS}: Final Validation\n`));
     const validationResult = await runStep('Validation', async () => {
       const checks = [];
 
@@ -160,6 +212,12 @@ export async function installCommand(options) {
       const gogExists = await commandExists('gog');
       checks.push({ name: 'gog CLI', passed: gogExists });
       printStatus(gogExists ? 'success' : 'info', `gog CLI: ${gogExists ? 'available' : 'not found'}`);
+
+      // Check configured channels
+      const channels = channelSetup.getConfiguredChannels();
+      const channelCount = Object.keys(channels).length;
+      printStatus(channelCount > 0 ? 'success' : 'info',
+        `Channels configured: ${channelCount > 0 ? Object.keys(channels).join(', ') : 'none'}`);
 
       return { status: 'success', checks };
     });
@@ -220,6 +278,7 @@ function printFinalSummary(results, options) {
   }));
 
   if (!options.dryRun) {
+    console.log(chalk.gray('  Run "openclaw-easyset doctor" to verify your installation.'));
     console.log(chalk.gray('  Run "openclaw-easyset configure" to modify settings later.'));
   }
 }

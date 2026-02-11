@@ -13,6 +13,10 @@ import { configureCommand } from './commands/configure.js';
 import { doctorCommand } from './commands/doctor.js';
 import { statusCommand } from './commands/status.js';
 import { backupCommand } from './commands/backup.js';
+import { securityCommand } from './commands/security.js';
+import { dockerCommand } from './commands/docker.js';
+import { serviceCommand } from './commands/service.js';
+import { skillsCommand } from './commands/skills.js';
 import logger from './core/logger.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -54,7 +58,7 @@ program
 // Install command
 program
   .command('install')
-  .description('Install and configure OpenClaw with guided wizard')
+  .description('Install and configure OpenClaw with guided 9-step wizard')
   .option('-m, --mode <type>', 'Installation mode (native|docker|auto)', 'auto')
   .option('--dry-run', 'Simulate installation without making changes')
   .option('--yes', 'Accept all defaults')
@@ -63,7 +67,7 @@ program
 // Configure command
 program
   .command('configure [section]')
-  .description('Configure OpenClaw settings (sections: plugins, skills, gog)')
+  .description('Configure subsystems (sections: plugins, channels, skills, gog, security)')
   .option('--dry-run', 'Simulate changes without writing')
   .option('--yes', 'Accept all defaults')
   .action(configureCommand);
@@ -91,6 +95,42 @@ program
   .option('-l, --label <label>', 'Label for the backup')
   .option('-n, --name <name>', 'Backup name (for restore)')
   .action(backupCommand);
+
+// Security command
+program
+  .command('security')
+  .description('Security audit and hardening')
+  .option('--audit', 'Run security audit')
+  .option('--profile <name>', 'Apply security profile (minimal, standard, hardened)')
+  .option('--fix', 'Auto-fix security issues')
+  .option('--dry-run', 'Simulate changes without writing')
+  .action(securityCommand);
+
+// Docker command
+program
+  .command('docker [action]')
+  .description('Manage Docker-based OpenClaw (actions: install, status, start, stop, restart, logs, update, uninstall)')
+  .option('--dry-run', 'Simulate changes without writing')
+  .option('--lines <n>', 'Number of log lines to show', '50')
+  .action(dockerCommand);
+
+// Service command
+program
+  .command('service [action]')
+  .description('Manage system service (actions: install, status, start, stop, restart, uninstall)')
+  .option('--dry-run', 'Simulate changes without writing')
+  .action(serviceCommand);
+
+// Skills command
+program
+  .command('skills [action]')
+  .description('Browse and manage skills (actions: list, catalog, search, install, uninstall, update)')
+  .option('--dry-run', 'Simulate changes without writing')
+  .option('--name <name>', 'Skill name')
+  .option('--query <query>', 'Search query')
+  .option('--category <cat>', 'Filter by category')
+  .option('--force', 'Force install/overwrite')
+  .action(skillsCommand);
 
 // Parse arguments
 program.parse(process.argv);
