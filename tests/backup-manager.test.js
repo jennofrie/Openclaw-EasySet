@@ -1,12 +1,29 @@
 import { describe, test, expect } from '@jest/globals';
-import { existsSync, rmSync } from 'fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 
 describe('BackupManager', () => {
   let backupManager;
+  const openclawDir = join(homedir(), '.openclaw');
+  const openclawConfig = join(openclawDir, 'openclaw.json');
+  let createdConfigFixture = false;
 
   beforeAll(async () => {
+    if (!existsSync(openclawConfig)) {
+      mkdirSync(openclawDir, { recursive: true });
+      writeFileSync(openclawConfig, JSON.stringify({ gateway: { port: 18789 } }, null, 2));
+      createdConfigFixture = true;
+    }
+
     const module = await import('../src/core/backup-manager.js');
     backupManager = module.default;
+  });
+
+  afterAll(() => {
+    if (createdConfigFixture && existsSync(openclawConfig)) {
+      rmSync(openclawConfig, { force: true });
+    }
   });
 
   test('should list backups without error', () => {
