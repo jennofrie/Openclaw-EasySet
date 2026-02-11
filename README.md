@@ -183,6 +183,16 @@ openclaw-easyset skills update --name github
 - **Memory**: 4GB RAM minimum
 - **OS**: macOS (primary), Linux, Windows (WSL2)
 
+### Compatibility Guardrail
+
+EasySet includes an upstream docs compatibility check to detect OpenClaw schema/key drift early:
+
+```bash
+npm run check:upstream
+```
+
+This check also runs in GitHub Actions CI on push/PR and weekly schedule.
+
 ---
 
 ## Project Structure
