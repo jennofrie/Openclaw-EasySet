@@ -11,9 +11,9 @@ import chalk from 'chalk';
 import { commandExists, executeCommand, formatBytes } from './utils.js';
 import serviceManager from './service-manager.js';
 import logger from './logger.js';
+import { loadOpenClawConfig, OPENCLAW_CONFIG } from './openclaw-config.js';
 
 const OPENCLAW_DIR = join(homedir(), '.openclaw');
-const OPENCLAW_CONFIG = join(OPENCLAW_DIR, 'openclaw.json');
 const OPENCLAW_ENV = join(OPENCLAW_DIR, '.env');
 const MEMORY_DIR = join(OPENCLAW_DIR, 'memory');
 const WORKSPACE_DIR = join(OPENCLAW_DIR, 'workspace');
@@ -73,8 +73,7 @@ class HealthChecker {
 
     // Check it's valid JSON
     try {
-      const data = readFileSync(OPENCLAW_CONFIG, 'utf-8');
-      const config = JSON.parse(data);
+      const { config } = loadOpenClawConfig({ optional: false });
       this.addResult('Config Valid JSON', 'config', 'pass', 'openclaw.json is valid');
 
       // Check essential sections exist
@@ -244,7 +243,7 @@ class HealthChecker {
     if (!existsSync(OPENCLAW_CONFIG)) return;
 
     try {
-      const config = JSON.parse(readFileSync(OPENCLAW_CONFIG, 'utf-8'));
+      const { config } = loadOpenClawConfig({ optional: false });
 
       // Check auth profiles
       const profiles = config.auth?.profiles || {};
@@ -258,14 +257,15 @@ class HealthChecker {
       }
 
       // Check gateway auth token
-      if (config.gateway?.auth?.token) {
-        const tokenLen = config.gateway.auth.token.length;
-        this.addResult('Gateway Auth', 'security', tokenLen >= 32 ? 'pass' : 'warn',
-          tokenLen >= 32 ? 'Gateway token set (strong)' : 'Gateway token is weak',
-          tokenLen < 32 ? 'Regenerate with a longer token' : null);
+      if (config.gateway?.auth?.token || config.gateway?.auth?.password) {
+        const secret = config.gateway.auth.token || config.gateway.auth.password;
+        const tokenLen = secret.length;
+        this.addResult('Gateway Auth', 'security', tokenLen >= 24 ? 'pass' : 'warn',
+          tokenLen >= 24 ? 'Gateway auth configured (strong)' : 'Gateway auth secret may be weak',
+          tokenLen < 24 ? 'Use a longer gateway token/password' : null);
       } else {
         this.addResult('Gateway Auth', 'security', 'fail',
-          'No gateway auth token set', 'Set gateway.auth.token in openclaw.json');
+          'No gateway auth secret found', 'Run: openclaw doctor --generate-gateway-token');
       }
 
       // Check credentials directory

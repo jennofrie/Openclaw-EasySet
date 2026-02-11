@@ -4,15 +4,11 @@
  * @module core/plugin-manager
  */
 
-import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { existsSync, copyFileSync } from 'fs';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import logger from './logger.js';
-
-const OPENCLAW_DIR = join(homedir(), '.openclaw');
-const OPENCLAW_CONFIG = join(OPENCLAW_DIR, 'openclaw.json');
+import { OPENCLAW_CONFIG, loadOpenClawConfig, saveOpenClawConfig } from './openclaw-config.js';
 
 /**
  * Plugin Manager
@@ -33,8 +29,8 @@ class PluginManager {
         return null;
       }
 
-      const data = readFileSync(OPENCLAW_CONFIG, 'utf-8');
-      this.config = JSON.parse(data);
+      const { config } = loadOpenClawConfig({ optional: false });
+      this.config = config;
       logger.debug('OpenClaw config loaded successfully');
       return this.config;
     } catch (error) {
@@ -72,7 +68,7 @@ class PluginManager {
    */
   saveOpenClawConfig(config) {
     try {
-      writeFileSync(OPENCLAW_CONFIG, JSON.stringify(config, null, 2), 'utf-8');
+      saveOpenClawConfig(config);
       this.config = config;
       logger.debug('OpenClaw config saved successfully');
       return true;

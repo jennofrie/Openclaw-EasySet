@@ -7,11 +7,12 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { existsSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import { existsSync, chmodSync } from 'fs';
 import { join } from 'path';
 import { homedir, platform } from 'os';
 import logger from '../core/logger.js';
 import { executeCommand } from '../core/utils.js';
+import { loadOpenClawConfig, saveOpenClawConfig } from '../core/openclaw-config.js';
 
 /**
  * Security profiles with predefined settings
@@ -95,34 +96,36 @@ async function runSecurityAudit(options) {
     let config = {};
 
     if (existsSync(configPath)) {
-      config = JSON.parse(readFileSync(configPath, 'utf-8'));
+      config = loadOpenClawConfig({ optional: false }).config;
     }
 
-    // Check 1: Pairing mode
+    // Check 1: Pairing/allowlist mode
     results.maxScore += 20;
-    if (config.security?.pairing !== false) {
+    const dmPolicies = getDmPolicies(config);
+    const openPolicies = dmPolicies.filter(p => p.policy === 'open');
+    if (openPolicies.length === 0) {
       results.score += 20;
-      results.passed.push('Pairing mode enabled - new devices require approval');
+      results.passed.push('DM policies are not publicly open');
     } else {
       results.issues.push({
         severity: 'high',
-        title: 'Pairing mode disabled',
-        description: 'Any device can connect without approval',
-        fix: 'Enable pairing in security settings'
+        title: 'Open DM policy detected',
+        description: `Public DM access enabled for: ${openPolicies.map(p => p.channel).join(', ')}`,
+        fix: 'Use dmPolicy "pairing" or "allowlist" for exposed channels'
       });
     }
 
-    // Check 2: Webhook verification
+    // Check 2: Gateway auth
     results.maxScore += 15;
-    if (config.security?.webhookVerification) {
+    if (config.gateway?.auth?.token || config.gateway?.auth?.password) {
       results.score += 15;
-      results.passed.push('Webhook signature verification enabled');
+      results.passed.push('Gateway auth secret configured');
     } else {
       results.issues.push({
-        severity: 'medium',
-        title: 'Webhook verification disabled',
-        description: 'Incoming webhooks are not verified',
-        fix: 'Enable webhook verification'
+        severity: 'high',
+        title: 'Gateway auth not configured',
+        description: 'Gateway token/password is missing',
+        fix: 'Run: openclaw doctor --generate-gateway-token'
       });
     }
 
@@ -146,12 +149,14 @@ async function runSecurityAudit(options) {
       }
     }
 
-    // Check 4: API key in environment vs config
+    // Check 4: Auth profiles / API key storage
     results.maxScore += 10;
-    if (process.env.ANTHROPIC_API_KEY && !config.anthropic?.apiKey) {
+    const hasAuthProfiles = !!config.auth?.profiles && Object.keys(config.auth.profiles).length > 0;
+    const hasEnvApiKey = !!process.env.ANTHROPIC_API_KEY || !!process.env.OPENAI_API_KEY;
+    if (hasAuthProfiles || hasEnvApiKey) {
       results.score += 10;
-      results.passed.push('API key stored in environment variable (not in config)');
-    } else if (config.anthropic?.apiKey) {
+      results.passed.push('Model authentication source configured');
+    } else if (config.anthropic?.apiKey || config.openai?.apiKey) {
       results.warnings.push({
         severity: 'low',
         title: 'API key in config file',
@@ -186,7 +191,8 @@ async function runSecurityAudit(options) {
 
     // Check 6: Trusted proxies configuration
     results.maxScore += 10;
-    if (config.security?.trustedProxies && config.security.trustedProxies.length > 0) {
+    const trustedProxies = config.gateway?.trustedProxies || config.security?.trustedProxies || [];
+    if (Array.isArray(trustedProxies) && trustedProxies.length > 0) {
       results.score += 10;
       results.passed.push('Trusted proxies configured');
     } else if (bindAddress !== 'loopback') {
@@ -198,7 +204,21 @@ async function runSecurityAudit(options) {
       });
     }
 
-    // Check 7: Log directory permissions
+    // Check 7: Control UI dangerous settings
+    results.maxScore += 10;
+    if (config.gateway?.controlUi?.dangerouslyDisableDeviceAuth) {
+      results.issues.push({
+        severity: 'high',
+        title: 'Control UI device auth disabled',
+        description: 'dangerouslyDisableDeviceAuth is enabled',
+        fix: 'Set gateway.controlUi.dangerouslyDisableDeviceAuth to false'
+      });
+    } else {
+      results.score += 10;
+      results.passed.push('Control UI device auth guard is enabled');
+    }
+
+    // Check 8: Log directory permissions
     if (platform() !== 'win32') {
       results.maxScore += 10;
       const logDir = join(homedir(), '.openclaw', 'logs');
@@ -221,7 +241,7 @@ async function runSecurityAudit(options) {
       }
     }
 
-    // Check 8: Workspace permissions
+    // Check 9: Workspace permissions
     if (platform() !== 'win32') {
       results.maxScore += 5;
       const workspaceDir = join(homedir(), '.openclaw', 'workspace');
@@ -369,7 +389,7 @@ async function applySecurityProfile(profileName, options) {
   let config = {};
 
   if (existsSync(configPath)) {
-    config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    config = loadOpenClawConfig({ optional: false }).config;
   }
 
   // Merge security settings
@@ -384,7 +404,7 @@ async function applySecurityProfile(profileName, options) {
     return { success: true, simulated: true };
   }
 
-  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+  saveOpenClawConfig(config, { backup: true });
 
   // Fix file permissions on Unix
   if (platform() !== 'win32') {
@@ -461,7 +481,7 @@ async function interactiveSecuritySetup(options) {
   let config = {};
 
   if (existsSync(configPath)) {
-    config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    config = loadOpenClawConfig({ optional: false }).config;
   }
 
   config.security = {
@@ -478,7 +498,7 @@ async function interactiveSecuritySetup(options) {
     return { success: true, simulated: true };
   }
 
-  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+  saveOpenClawConfig(config, { backup: true });
 
   if (platform() !== 'win32') {
     chmodSync(configPath, 0o600);
@@ -492,3 +512,24 @@ async function interactiveSecuritySetup(options) {
 }
 
 export default securityCommand;
+
+/**
+ * Collect DM policies across common channels.
+ * @param {Object} config
+ * @returns {Array<{channel: string, policy: string}>}
+ */
+function getDmPolicies(config) {
+  const channels = ['whatsapp', 'telegram', 'signal', 'imessage', 'mattermost', 'googlechat'];
+  const policies = [];
+
+  for (const channel of channels) {
+    const value = config.channels?.[channel];
+    if (!value) continue;
+    const policy = value.dmPolicy || value.dm?.policy;
+    if (policy) {
+      policies.push({ channel, policy });
+    }
+  }
+
+  return policies;
+}

@@ -15,7 +15,7 @@ import logger from './logger.js';
 const REQUIREMENTS = {
   memory: 4 * 1024 * 1024 * 1024, // 4GB
   diskSpace: 1 * 1024 * 1024 * 1024, // 1GB
-  nodeVersion: '18.0.0',
+  nodeVersion: '22.0.0',
 };
 
 /**

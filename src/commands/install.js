@@ -15,6 +15,7 @@ import gogSetup from '../core/gog-setup.js';
 import channelSetup from '../core/channel-setup.js';
 import { commandExists, createSpinner, executeCommand, executeInteractiveCommand, printStatus } from '../core/utils.js';
 import logger from '../core/logger.js';
+import { loadOpenClawConfig } from '../core/openclaw-config.js';
 
 const OPENCLAW_CONFIG = join(homedir(), '.openclaw', 'openclaw.json');
 const TOTAL_STEPS = 9;
@@ -193,13 +194,12 @@ export async function installCommand(options) {
       // Verify config is valid JSON
       if (existsSync(OPENCLAW_CONFIG) && !options.dryRun) {
         try {
-          const { readFileSync } = await import('fs');
-          JSON.parse(readFileSync(OPENCLAW_CONFIG, 'utf-8'));
+          loadOpenClawConfig({ optional: false });
           checks.push({ name: 'Config valid JSON', passed: true });
-          printStatus('success', 'openclaw.json is valid JSON');
+          printStatus('success', 'openclaw.json is valid JSON/JSON5');
         } catch {
           checks.push({ name: 'Config valid JSON', passed: false });
-          printStatus('error', 'openclaw.json is NOT valid JSON');
+          printStatus('error', 'openclaw.json is not valid JSON/JSON5');
         }
       }
 

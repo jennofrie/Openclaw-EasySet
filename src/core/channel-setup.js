@@ -5,15 +5,12 @@
  * @module core/channel-setup
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { homedir, platform } from 'os';
+import { platform } from 'os';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { commandExists, executeCommand, createSpinner } from './utils.js';
 import logger from './logger.js';
-
-const OPENCLAW_CONFIG = join(homedir(), '.openclaw', 'openclaw.json');
+import { loadOpenClawConfig, saveOpenClawConfig } from './openclaw-config.js';
 
 /**
  * Channel definitions with setup requirements
@@ -55,9 +52,8 @@ class ChannelSetup {
    */
   loadConfig() {
     try {
-      if (existsSync(OPENCLAW_CONFIG)) {
-        return JSON.parse(readFileSync(OPENCLAW_CONFIG, 'utf-8'));
-      }
+      const { config } = loadOpenClawConfig({ optional: true });
+      return config;
     } catch (error) {
       logger.warn(`Failed to load config: ${error.message}`);
     }
@@ -69,7 +65,7 @@ class ChannelSetup {
    * @param {Object} config - Config to save
    */
   saveConfig(config) {
-    writeFileSync(OPENCLAW_CONFIG, JSON.stringify(config, null, 2), 'utf-8');
+    saveOpenClawConfig(config, { backup: true });
   }
 
   /**
@@ -281,10 +277,19 @@ class ChannelSetup {
     const config = this.loadConfig() || {};
     if (!config.channels) config.channels = {};
 
+    const normalizedChatId = answers.chatId.trim();
+    const allowFrom = new Set(config.channels.telegram?.allowFrom || []);
+    allowFrom.add(normalizedChatId);
+    if (!normalizedChatId.startsWith('tg:')) {
+      allowFrom.add(`tg:${normalizedChatId}`);
+    }
+
     config.channels.telegram = {
       ...config.channels.telegram,
       botToken: answers.botToken.trim(),
-      chatId: answers.chatId.trim(),
+      chatId: normalizedChatId,
+      dmPolicy: config.channels.telegram?.dmPolicy || 'allowlist',
+      allowFrom: [...allowFrom],
       enabled: true,
     };
 
