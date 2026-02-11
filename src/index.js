@@ -8,6 +8,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { detectCommand } from './commands/detect.js';
+import { installCommand } from './commands/install.js';
 import logger from './core/logger.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -46,17 +47,16 @@ program
   .option('--json', 'Output as JSON')
   .action(detectCommand);
 
-// Install command (placeholder for Phase 2)
+// Install command
 program
   .command('install')
   .description('Install and configure OpenClaw')
   .option('-m, --mode <type>', 'Installation mode (native|docker|auto)', 'auto')
   .option('--dry-run', 'Simulate installation without making changes')
   .option('--yes', 'Accept all defaults')
-  .action(() => {
-    console.log(chalk.yellow('⚠️  Install command coming in Phase 2'));
-    console.log('Run', chalk.cyan('openclaw-easyset detect'), 'to check your system');
-  });
+  .option('--skip-npm', 'Skip npm install (for testing)')
+  .option('--force', 'Install even if requirements not met (not recommended)')
+  .action(installCommand);
 
 // Configure command (placeholder)
 program
