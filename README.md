@@ -9,9 +9,14 @@ OpenClaw EasySet is a robust, user-friendly CLI automation tool designed to stre
 ## ✨ Features
 
 - **🔍 Platform Detection** - Automatically detects OS, architecture, and system capabilities
-- **📦 Automated Installation** - One-command setup for all dependencies (Coming in Phase 2)
-- **🖥️ Multi-Platform Support** - macOS, Linux, Windows compatibility
-- **🐳 Dual Deployment** - Native or Docker installation options
+- **📦 Automated Installation** - One-command setup for native or Docker deployments
+- **🖥️ Multi-Platform Support** - macOS, Linux, Windows 11 compatibility
+- **🐳 Docker Support** - Full Docker-based installation and management
+- **⚙️ Service Management** - Install as system service (Task Scheduler, launchd, systemd)
+- **🎯 Skills Marketplace** - Browse, install, and manage OpenClaw skills
+- **🔒 Security Hardening** - Security audits and profile-based hardening
+- **💾 Backup & Restore** - Full backup and restore functionality
+- **🖥️ Multi-Terminal** - Parallel terminal execution for installation
 - **🧙 Interactive Wizards** - Guided configuration with intelligent defaults
 - **✅ Safety Features** - Dry-run mode, backups, and rollback capabilities
 - **📊 Health Checks** - Comprehensive system diagnostics
@@ -32,6 +37,19 @@ npm install -g openclaw-easyset
 openclaw-easyset detect --recommendations
 ```
 
+### Install OpenClaw
+
+```bash
+# Interactive installation (recommended)
+openclaw-easyset install
+
+# Quick install with defaults
+openclaw-easyset install --yes
+
+# Docker installation
+openclaw-easyset install --mode docker
+```
+
 ---
 
 ## 📋 System Requirements
@@ -39,7 +57,7 @@ openclaw-easyset detect --recommendations
 - **Node.js**: v18.0.0 or higher
 - **Memory**: 4GB RAM minimum
 - **Disk Space**: 1GB free space
-- **OS**: macOS, Linux, or Windows (with WSL2)
+- **OS**: macOS, Linux, or Windows 11
 
 ---
 
@@ -62,51 +80,48 @@ openclaw-easyset detect --recommendations
 - [x] Workspace template generation
 - [x] Multi-instance support (Profexor, Tokyoneon, custom)
 - [x] Identity file generation
-- [ ] Docker installation flow (Coming Soon)
-- [ ] Service management (Coming Soon)
+- [x] Docker installation flow
+- [x] Service management (Windows Task Scheduler, macOS launchd, Linux systemd)
 
-### 📅 Phase 3: Advanced Features (Planned)
+### ✅ Phase 3: Advanced Features (COMPLETE)
 
-- [ ] Multi-terminal execution
-- [ ] Skills marketplace integration
-- [ ] Security hardening
-- [ ] Backup & restore
+- [x] Multi-terminal execution
+- [x] Skills marketplace integration
+- [x] Security hardening
+- [x] Backup & restore
+- [x] Health diagnostics (doctor command)
 
 ---
 
 ## 💻 Usage
 
-### Detect Platform
-
-Check your system capabilities and get installation recommendations:
+### Platform Detection
 
 ```bash
+# Check system capabilities
 openclaw-easyset detect --recommendations
-```
 
-Output as JSON:
-
-```bash
+# Output as JSON
 openclaw-easyset detect --json
 ```
 
-### Install OpenClaw
+### Installation
 
 ```bash
-# Interactive installation (recommended)
+# Interactive installation
 openclaw-easyset install
 
-# Quick install with defaults
+# Non-interactive with defaults
 openclaw-easyset install --yes
+
+# Docker installation
+openclaw-easyset install --mode docker
 
 # Dry-run to preview changes
 openclaw-easyset install --dry-run
 
-# Force install (skip requirements check)
+# Force install (skip requirements)
 openclaw-easyset install --force
-
-# Docker installation (coming soon)
-openclaw-easyset install --mode docker
 ```
 
 **Supported Instances:**
@@ -115,17 +130,137 @@ openclaw-easyset install --mode docker
 - `forge` 🔥 - Build automation (any platform)
 - Custom - Create your own identity
 
-### Check Status (Coming in Phase 2)
+### Docker Management
 
 ```bash
-openclaw-easyset status --detailed
+# Install via Docker
+openclaw-easyset docker install
+
+# Check container status
+openclaw-easyset docker status
+
+# Start/stop container
+openclaw-easyset docker start
+openclaw-easyset docker stop
+
+# View logs
+openclaw-easyset docker logs -n 100
+
+# Uninstall
+openclaw-easyset docker uninstall
 ```
 
-### Health Check (Coming in Phase 3)
+### Service Management
 
 ```bash
+# Install as system service
+openclaw-easyset service install
+
+# Check service status
+openclaw-easyset service status
+
+# Start/stop/restart
+openclaw-easyset service start
+openclaw-easyset service stop
+openclaw-easyset service restart
+
+# Uninstall service
+openclaw-easyset service uninstall
+```
+
+**Platform Support:**
+- **Windows**: Task Scheduler
+- **macOS**: launchd (LaunchAgents)
+- **Linux**: systemd (user services)
+
+### Skills Marketplace
+
+```bash
+# List installed skills
+openclaw-easyset skills list
+
+# Browse skill catalog
+openclaw-easyset skills catalog
+
+# Search for skills
+openclaw-easyset skills search "calendar"
+
+# Install a skill
+openclaw-easyset skills install voice-call
+
+# Update a skill
+openclaw-easyset skills update voice-call
+
+# Uninstall a skill
+openclaw-easyset skills uninstall voice-call
+```
+
+### Security Hardening
+
+```bash
+# Run security audit
+openclaw-easyset security --audit
+
+# Auto-fix security issues
+openclaw-easyset security --audit --fix
+
+# Apply security profile
+openclaw-easyset security --profile standard
+# Profiles: minimal, standard, hardened
+
+# Interactive security setup
+openclaw-easyset security
+```
+
+### Backup & Restore
+
+```bash
+# Create backup
+openclaw-easyset backup create
+
+# List backups
+openclaw-easyset backup list
+
+# Restore from backup
+openclaw-easyset backup restore
+
+# Delete a backup
+openclaw-easyset backup delete
+
+# Export portable backup (sanitized)
+openclaw-easyset backup export
+
+# Import external backup
+openclaw-easyset backup import --file backup.tar.gz
+```
+
+### Status & Diagnostics
+
+```bash
+# Check overall status
+openclaw-easyset status
+
+# Detailed status
+openclaw-easyset status --detailed
+
+# Run diagnostics
+openclaw-easyset doctor
+
+# Auto-fix issues
 openclaw-easyset doctor --fix
 ```
+
+### Multi-Terminal Execution
+
+```bash
+# Open installation terminals
+openclaw-easyset terminals
+```
+
+Opens 3 terminal windows:
+1. Main installation progress
+2. Dependency installation logs
+3. Gateway logs
 
 ---
 
@@ -145,10 +280,14 @@ npm install
 npm test
 ```
 
-### Run with Debug Logging
+### Run Locally
 
 ```bash
-npm start -- detect --debug
+# Run CLI directly
+node src/index.js detect --recommendations
+
+# Run with debug logging
+node src/index.js install --debug --dry-run
 ```
 
 ---
@@ -157,7 +296,7 @@ npm start -- detect --debug
 
 Comprehensive planning documentation is available in the `.planning/` directory:
 
-- **[Implementation Plan](. planning/implementation-plan.md)** - Complete technical specifications
+- **[Implementation Plan](.planning/implementation-plan.md)** - Complete technical specifications
 - **[Testing Guide](.planning/testing-guide.md)** - Testing methodology and safety protocols
 - **[Delivery Summary](.planning/delivery-summary.md)** - Project deliverables overview
 
@@ -169,20 +308,28 @@ Comprehensive planning documentation is available in the `.planning/` directory:
 openclaw-easyset/
 ├── src/
 │   ├── commands/           # CLI commands
-│   │   └── detect.js       # Platform detection command
-│   ├── core/              # Core modules
+│   │   ├── detect.js       # Platform detection
+│   │   ├── install.js      # Installation
+│   │   ├── security.js     # Security hardening
+│   │   └── backup.js       # Backup & restore
+│   ├── core/               # Core modules
 │   │   ├── platform-detector.js
+│   │   ├── docker-manager.js
+│   │   ├── terminal-orchestrator.js
 │   │   ├── logger.js
 │   │   ├── config.js
 │   │   └── utils.js
-│   └── index.js           # Main CLI entry point
-├── tests/                 # Jest tests
-│   └── platform-detector.test.js
-├── .planning/             # Planning documents
-│   ├── implementation-plan.md
-│   ├── testing-guide.md
-│   └── delivery-summary.md
+│   ├── services/           # Service management
+│   │   └── service-manager.js
+│   ├── skills/             # Skills marketplace
+│   │   └── marketplace.js
+│   ├── templates/          # Workspace templates
+│   │   └── workspace.js
+│   └── index.js            # Main CLI entry
+├── tests/                  # Jest tests
+├── .planning/              # Planning docs
 ├── package.json
+├── CHANGELOG.md
 └── README.md
 ```
 
@@ -220,7 +367,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Credits
 
 **Developed by:** OpenClaw Community  
-**Built with** 🦾 **by** Profexor
+**Built with** 🦾 **by** Profexor & Tokyoneon
 
 Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem.
 
@@ -237,9 +384,9 @@ Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem.
 ## 🗺️ Roadmap
 
 - **Phase 1** (✅ Complete): Foundation & Platform Detection
-- **Phase 2** (In Progress): Installation & Configuration
-- **Phase 3** (Planned): Advanced Features & Community Tools
-- **Phase 4** (Future): Plugin Marketplace & Templates
+- **Phase 2** (✅ Complete): Installation & Configuration
+- **Phase 3** (✅ Complete): Advanced Features & Security
+- **Phase 4** (Planned): Plugin Templates & Community Tools
 
 ---
 
