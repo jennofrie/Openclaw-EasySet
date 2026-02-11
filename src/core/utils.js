@@ -3,9 +3,9 @@
  * @module core/utils
  */
 
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
+import { existsSync, accessSync, constants } from 'fs';
 import chalk from 'chalk';
 import ora from 'ora';
 import logger from './logger.js';
@@ -157,9 +157,7 @@ export function compareVersions(version1, version2) {
 export function isWritable(dirPath) {
   try {
     if (!existsSync(dirPath)) return false;
-    
-    // Try to access with write permission
-    const { accessSync, constants } = await import('fs');
+
     accessSync(dirPath, constants.W_OK);
     return true;
   } catch {
@@ -274,4 +272,37 @@ export async function retry(fn, maxAttempts = 3, delayMs = 1000) {
   }
 
   throw lastError;
+}
+
+/**
+ * Execute an interactive command with inherited stdio
+ * Used for commands that require user interaction (e.g., OAuth flows)
+ * @param {string} cmd - Command to execute (first word is the binary, rest are args)
+ * @returns {Promise<void>} Resolves when command exits with code 0
+ */
+export function executeInteractiveCommand(cmd) {
+  return new Promise((resolve, reject) => {
+    const parts = cmd.split(/\s+/);
+    const command = parts[0];
+    const args = parts.slice(1);
+
+    logger.debug(`Executing interactive command: ${cmd}`);
+
+    const child = spawn(command, args, {
+      stdio: 'inherit',
+      shell: true,
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Command "${cmd}" exited with code ${code}`));
+      }
+    });
+
+    child.on('error', (error) => {
+      reject(error);
+    });
+  });
 }

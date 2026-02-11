@@ -8,6 +8,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { detectCommand } from './commands/detect.js';
+import { installCommand } from './commands/install.js';
+import { configureCommand } from './commands/configure.js';
 import logger from './core/logger.js';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -46,25 +48,22 @@ program
   .option('--json', 'Output as JSON')
   .action(detectCommand);
 
-// Install command (placeholder for Phase 2)
+// Install command
 program
   .command('install')
   .description('Install and configure OpenClaw')
   .option('-m, --mode <type>', 'Installation mode (native|docker|auto)', 'auto')
   .option('--dry-run', 'Simulate installation without making changes')
   .option('--yes', 'Accept all defaults')
-  .action(() => {
-    console.log(chalk.yellow('⚠️  Install command coming in Phase 2'));
-    console.log('Run', chalk.cyan('openclaw-easyset detect'), 'to check your system');
-  });
+  .action(installCommand);
 
-// Configure command (placeholder)
+// Configure command
 program
-  .command('configure')
-  .description('Configure OpenClaw settings')
-  .action(() => {
-    console.log(chalk.yellow('⚠️  Configure command coming in Phase 2'));
-  });
+  .command('configure [section]')
+  .description('Configure OpenClaw settings (sections: plugins, skills, gog)')
+  .option('--dry-run', 'Simulate changes without writing')
+  .option('--yes', 'Accept all defaults')
+  .action(configureCommand);
 
 // Doctor command (placeholder)
 program
