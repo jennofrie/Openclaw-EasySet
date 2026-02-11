@@ -12,7 +12,7 @@ import { join } from 'path';
 import { homedir, platform } from 'os';
 import logger from '../core/logger.js';
 import { executeCommand } from '../core/utils.js';
-import { loadOpenClawConfig, saveOpenClawConfig } from '../core/openclaw-config.js';
+import { loadOpenClawConfig, updateOpenClawConfig } from '../core/openclaw-config.js';
 
 /**
  * Security profiles with predefined settings
@@ -386,17 +386,6 @@ async function applySecurityProfile(profileName, options) {
   console.log();
 
   const configPath = join(homedir(), '.openclaw', 'openclaw.json');
-  let config = {};
-
-  if (existsSync(configPath)) {
-    config = loadOpenClawConfig({ optional: false }).config;
-  }
-
-  // Merge security settings
-  config.security = {
-    ...config.security,
-    ...profile.settings
-  };
 
   if (dryRun) {
     console.log(chalk.cyan('[DRY-RUN] Would apply settings:'));
@@ -404,7 +393,39 @@ async function applySecurityProfile(profileName, options) {
     return { success: true, simulated: true };
   }
 
-  saveOpenClawConfig(config, { backup: true });
+  updateOpenClawConfig((_, tools) => {
+    tools.merge('security', profile.settings);
+
+    if (Array.isArray(profile.settings.trustedProxies)) {
+      tools.set('gateway.trustedProxies', profile.settings.trustedProxies);
+    }
+
+    if (profile.settings.pairing === true) {
+      const channels = ['telegram', 'imessage', 'whatsapp', 'discord', 'slack'];
+      for (const channel of channels) {
+        const channelConfig = tools.get(`channels.${channel}`);
+        if (channelConfig && typeof channelConfig === 'object') {
+          const currentPolicy = tools.get(`channels.${channel}.dmPolicy`);
+          if (!currentPolicy || currentPolicy === 'open') {
+            tools.set(`channels.${channel}.dmPolicy`, 'pairing');
+          }
+        }
+      }
+    }
+
+    if (profile.settings.pairing === false) {
+      const channels = ['telegram', 'imessage', 'whatsapp', 'discord', 'slack'];
+      for (const channel of channels) {
+        const channelConfig = tools.get(`channels.${channel}`);
+        if (channelConfig && typeof channelConfig === 'object') {
+          const currentPolicy = tools.get(`channels.${channel}.dmPolicy`);
+          if (!currentPolicy) {
+            tools.set(`channels.${channel}.dmPolicy`, 'open');
+          }
+        }
+      }
+    }
+  }, { backup: true, create: true });
 
   // Fix file permissions on Unix
   if (platform() !== 'win32') {
@@ -478,27 +499,35 @@ async function interactiveSecuritySetup(options) {
   ]);
 
   const configPath = join(homedir(), '.openclaw', 'openclaw.json');
-  let config = {};
 
-  if (existsSync(configPath)) {
-    config = loadOpenClawConfig({ optional: false }).config;
-  }
-
-  config.security = {
-    ...config.security,
+  const plannedSecurityConfig = {
     pairing: customAnswers.pairing,
     webhookVerification: customAnswers.webhookVerification,
     rateLimiting: customAnswers.rateLimiting,
-    trustedProxies: customAnswers.trustedProxies
+    trustedProxies: customAnswers.trustedProxies,
   };
 
   if (options.dryRun) {
     console.log(chalk.cyan('\n[DRY-RUN] Would save settings:'));
-    console.log(JSON.stringify(config.security, null, 2));
+    console.log(JSON.stringify(plannedSecurityConfig, null, 2));
     return { success: true, simulated: true };
   }
 
-  saveOpenClawConfig(config, { backup: true });
+  updateOpenClawConfig((_, tools) => {
+    tools.merge('security', plannedSecurityConfig);
+    tools.set('gateway.trustedProxies', customAnswers.trustedProxies);
+
+    const channels = ['telegram', 'imessage', 'whatsapp', 'discord', 'slack'];
+    for (const channel of channels) {
+      const channelConfig = tools.get(`channels.${channel}`);
+      if (!channelConfig || typeof channelConfig !== 'object') continue;
+
+      const currentPolicy = tools.get(`channels.${channel}.dmPolicy`);
+      if (!currentPolicy || currentPolicy === 'open' || currentPolicy === 'pairing') {
+        tools.set(`channels.${channel}.dmPolicy`, customAnswers.pairing ? 'pairing' : 'open');
+      }
+    }
+  }, { backup: true, create: true });
 
   if (platform() !== 'win32') {
     chmodSync(configPath, 0o600);

@@ -48,6 +48,7 @@ class HealthChecker {
     await this.checkConnectivity();
     await this.checkStorage();
     await this.checkCredentials();
+    await this.checkChannelSecurityPolicies();
     await this.checkTools();
     await this.checkLogs();
 
@@ -98,6 +99,9 @@ class HealthChecker {
       const channels = [];
       if (config.channels?.telegram?.enabled) channels.push('telegram');
       if (config.channels?.imessage?.enabled) channels.push('imessage');
+      if (config.channels?.whatsapp?.enabled) channels.push('whatsapp');
+      if (config.channels?.discord?.enabled) channels.push('discord');
+      if (config.channels?.slack?.enabled) channels.push('slack');
       this.addResult('Channels', 'config', channels.length > 0 ? 'pass' : 'warn',
         channels.length > 0 ? `Active: ${channels.join(', ')}` : 'No channels enabled');
 
@@ -308,6 +312,51 @@ class HealthChecker {
     } catch { /* config parse failed, already reported */ }
   }
 
+  async checkChannelSecurityPolicies() {
+    if (!existsSync(OPENCLAW_CONFIG)) return;
+
+    try {
+      const { config } = loadOpenClawConfig({ optional: false });
+      const channels = config.channels || {};
+      const audited = [
+        { key: 'whatsapp', label: 'WhatsApp' },
+        { key: 'discord', label: 'Discord' },
+        { key: 'slack', label: 'Slack' },
+      ];
+
+      for (const item of audited) {
+        const ch = channels[item.key];
+        if (!isChannelEnabled(ch)) continue;
+
+        const policy = ch.dmPolicy || ch.dm?.policy || 'default';
+        if (policy === 'open') {
+          this.addResult(`${item.label} DM Policy`, 'security', 'warn',
+            'dmPolicy is open',
+            `Set channels.${item.key}.dmPolicy to pairing or allowlist`);
+          continue;
+        }
+
+        if (policy === 'allowlist') {
+          const allowFrom = Array.isArray(ch.allowFrom) ? ch.allowFrom : [];
+          if (allowFrom.length === 0) {
+            this.addResult(`${item.label} DM Policy`, 'security', 'warn',
+              'allowlist policy is set but allowFrom is empty',
+              `Add trusted ids to channels.${item.key}.allowFrom`);
+          } else {
+            this.addResult(`${item.label} DM Policy`, 'security', 'pass',
+              `allowlist active (${allowFrom.length} trusted id(s))`);
+          }
+          continue;
+        }
+
+        this.addResult(`${item.label} DM Policy`, 'security', 'pass',
+          `dmPolicy: ${policy}`);
+      }
+    } catch {
+      // Config parse failures are already covered in checkConfig.
+    }
+  }
+
   // --- Tool Checks ---
 
   async checkTools() {
@@ -478,3 +527,11 @@ class HealthChecker {
 }
 
 export default new HealthChecker();
+
+function isChannelEnabled(channelConfig) {
+  if (!channelConfig || typeof channelConfig !== 'object') return false;
+  if (channelConfig.enabled === true) return true;
+  if (channelConfig.watchEnabled === true) return true;
+  if (channelConfig.botToken) return true;
+  return false;
+}

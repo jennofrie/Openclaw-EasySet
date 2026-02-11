@@ -10,7 +10,7 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { commandExists, executeCommand, createSpinner } from './utils.js';
 import logger from './logger.js';
-import { loadOpenClawConfig, saveOpenClawConfig } from './openclaw-config.js';
+import { loadOpenClawConfig, saveOpenClawConfig, updateOpenClawConfig } from './openclaw-config.js';
 
 /**
  * Channel definitions with setup requirements
@@ -66,6 +66,16 @@ class ChannelSetup {
    */
   saveConfig(config) {
     saveOpenClawConfig(config, { backup: true });
+  }
+
+  /**
+   * Apply a targeted patch to OpenClaw config for channel updates.
+   * @param {(tools: Object) => void} mutator
+   */
+  patchConfig(mutator) {
+    updateOpenClawConfig((config, tools) => {
+      mutator(tools);
+    }, { backup: true, create: true });
   }
 
   /**
@@ -274,26 +284,23 @@ class ChannelSetup {
       return { configured: true, simulated: true };
     }
 
-    const config = this.loadConfig() || {};
-    if (!config.channels) config.channels = {};
-
     const normalizedChatId = answers.chatId.trim();
-    const allowFrom = new Set(config.channels.telegram?.allowFrom || []);
-    allowFrom.add(normalizedChatId);
-    if (!normalizedChatId.startsWith('tg:')) {
-      allowFrom.add(`tg:${normalizedChatId}`);
-    }
+    this.patchConfig((tools) => {
+      tools.set('channels.telegram.botToken', answers.botToken.trim());
+      tools.set('channels.telegram.chatId', normalizedChatId);
+      tools.set('channels.telegram.enabled', true);
 
-    config.channels.telegram = {
-      ...config.channels.telegram,
-      botToken: answers.botToken.trim(),
-      chatId: normalizedChatId,
-      dmPolicy: config.channels.telegram?.dmPolicy || 'allowlist',
-      allowFrom: [...allowFrom],
-      enabled: true,
-    };
+      const currentPolicy = tools.get('channels.telegram.dmPolicy');
+      if (!currentPolicy) {
+        tools.set('channels.telegram.dmPolicy', 'allowlist');
+      }
 
-    this.saveConfig(config);
+      tools.pushUnique('channels.telegram.allowFrom', normalizedChatId);
+      if (!normalizedChatId.startsWith('tg:')) {
+        tools.pushUnique('channels.telegram.allowFrom', `tg:${normalizedChatId}`);
+      }
+    });
+
     console.log(chalk.green('  Telegram channel configured'));
     return { configured: true };
   }
@@ -361,15 +368,14 @@ class ChannelSetup {
       return { configured: true, simulated: true };
     }
 
-    const config = this.loadConfig() || {};
-    if (!config.channels) config.channels = {};
+    this.patchConfig((tools) => {
+      tools.set('channels.imessage.enabled', true);
+      const currentPolicy = tools.get('channels.imessage.dmPolicy');
+      if (!currentPolicy) {
+        tools.set('channels.imessage.dmPolicy', 'pairing');
+      }
+    });
 
-    config.channels.imessage = {
-      ...config.channels.imessage,
-      enabled: true,
-    };
-
-    this.saveConfig(config);
     console.log(chalk.green('  iMessage channel configured'));
     return { configured: true };
   }
@@ -421,16 +427,11 @@ class ChannelSetup {
       return { configured: true, simulated: true };
     }
 
-    const config = this.loadConfig() || {};
-    if (!config.channels) config.channels = {};
+    this.patchConfig((tools) => {
+      tools.set('channels.gmail.enabled', true);
+      tools.set('channels.gmail.watchEnabled', true);
+    });
 
-    config.channels.gmail = {
-      ...config.channels.gmail,
-      enabled: true,
-      watchEnabled: true,
-    };
-
-    this.saveConfig(config);
     console.log(chalk.green('  Gmail Pub/Sub channel configured'));
     console.log(chalk.gray('  The gmail-watch service will monitor your inbox'));
     return { configured: true };
@@ -463,16 +464,11 @@ class ChannelSetup {
       return { configured: true, simulated: true };
     }
 
-    const config = this.loadConfig() || {};
-    if (!config.channels) config.channels = {};
+    this.patchConfig((tools) => {
+      tools.set('channels.webchat.enabled', true);
+      tools.set('channels.webchat.port', parseInt(port, 10));
+    });
 
-    config.channels.webchat = {
-      ...config.channels.webchat,
-      enabled: true,
-      port: parseInt(port, 10),
-    };
-
-    this.saveConfig(config);
     console.log(chalk.green(`  Webchat configured on port ${port}`));
     return { configured: true };
   }

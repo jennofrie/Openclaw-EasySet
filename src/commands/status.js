@@ -77,20 +77,16 @@ export async function statusCommand(options) {
 
         // --- Channels ---
         console.log(chalk.bold('\n  Channels'));
-        const channels = [];
-        if (config.channels?.telegram?.enabled) {
-          channels.push({ name: 'Telegram', status: 'enabled' });
-          console.log(`    ${chalk.green('●')} Telegram: ${chalk.green('Enabled')}`);
-        }
-        if (config.channels?.imessage?.enabled) {
-          channels.push({ name: 'iMessage', status: 'enabled' });
-          const dmPolicy = config.channels.imessage.dmPolicy || 'default';
-          console.log(`    ${chalk.green('●')} iMessage: ${chalk.green('Enabled')} ${chalk.gray(`(${dmPolicy})`)}`);
-        }
-        if (channels.length === 0) {
+        const channelRows = buildChannelRows(config);
+        if (channelRows.length === 0) {
           console.log(chalk.gray('    No channels enabled'));
+        } else {
+          for (const row of channelRows) {
+            const policyLabel = row.dmPolicy ? ` ${chalk.gray(`(${row.dmPolicy})`)}` : '';
+            console.log(`    ${chalk.green('●')} ${row.name}: ${chalk.green('Enabled')}${policyLabel}`);
+          }
         }
-        status.channels = channels;
+        status.channels = channelRows;
 
         // --- Plugins ---
         console.log(chalk.bold('\n  Plugins'));
@@ -242,4 +238,41 @@ export async function statusCommand(options) {
     logger.error('Status check failed', error);
     console.log(chalk.red(`\nStatus check failed: ${error.message}`));
   }
+}
+
+function buildChannelRows(config) {
+  const rows = [];
+  const channels = config.channels || {};
+
+  const table = [
+    { key: 'telegram', name: 'Telegram' },
+    { key: 'imessage', name: 'iMessage' },
+    { key: 'whatsapp', name: 'WhatsApp' },
+    { key: 'discord', name: 'Discord' },
+    { key: 'slack', name: 'Slack' },
+    { key: 'gmail', name: 'Gmail' },
+    { key: 'webchat', name: 'Webchat' },
+  ];
+
+  for (const item of table) {
+    const channel = channels[item.key];
+    if (!channel || !isChannelEnabled(channel)) continue;
+
+    rows.push({
+      key: item.key,
+      name: item.name,
+      status: 'enabled',
+      dmPolicy: channel.dmPolicy || channel.dm?.policy || null,
+    });
+  }
+
+  return rows;
+}
+
+function isChannelEnabled(channelConfig) {
+  if (!channelConfig || typeof channelConfig !== 'object') return false;
+  if (channelConfig.enabled === true) return true;
+  if (channelConfig.watchEnabled === true) return true;
+  if (channelConfig.botToken) return true;
+  return false;
 }
