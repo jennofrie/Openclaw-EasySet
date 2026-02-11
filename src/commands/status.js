@@ -11,6 +11,7 @@ import boxen from 'boxen';
 import { commandExists, getCommandVersion, formatBytes } from '../core/utils.js';
 import serviceManager from '../core/service-manager.js';
 import logger from '../core/logger.js';
+import { loadOpenClawConfig } from '../core/openclaw-config.js';
 
 const OPENCLAW_DIR = join(homedir(), '.openclaw');
 const OPENCLAW_CONFIG = join(OPENCLAW_DIR, 'openclaw.json');
@@ -48,7 +49,7 @@ export async function statusCommand(options) {
     // Config status
     if (existsSync(OPENCLAW_CONFIG)) {
       try {
-        const config = JSON.parse(readFileSync(OPENCLAW_CONFIG, 'utf-8'));
+        const { config } = loadOpenClawConfig({ optional: false });
         const lastVersion = config.meta?.lastTouchedVersion || 'unknown';
         console.log(`    Config Version: ${chalk.gray(lastVersion)}`);
 

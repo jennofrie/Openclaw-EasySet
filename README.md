@@ -179,7 +179,7 @@ openclaw-easyset skills update --name github
 
 ## System Requirements
 
-- **Node.js**: v18.0.0+
+- **Node.js**: v22.0.0+
 - **Memory**: 4GB RAM minimum
 - **OS**: macOS (primary), Linux, Windows (WSL2)
 
@@ -279,7 +279,7 @@ node src/index.js doctor --debug
 
 ## Technologies
 
-- **Runtime**: Node.js v18+
+- **Runtime**: Node.js v22+
 - **CLI**: Commander.js
 - **UI**: Inquirer, Chalk, Ora, Boxen
 - **Logging**: Winston
