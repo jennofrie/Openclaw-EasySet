@@ -5,7 +5,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
+import { existsSync, accessSync, constants } from 'fs';
 import chalk from 'chalk';
 import ora from 'ora';
 import logger from './logger.js';
@@ -159,7 +159,6 @@ export function isWritable(dirPath) {
     if (!existsSync(dirPath)) return false;
     
     // Try to access with write permission
-    const { accessSync, constants } = await import('fs');
     accessSync(dirPath, constants.W_OK);
     return true;
   } catch {

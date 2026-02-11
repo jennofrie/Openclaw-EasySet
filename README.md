@@ -55,13 +55,15 @@ openclaw-easyset detect --recommendations
 - [x] Testing infrastructure (Jest)
 - [x] Project documentation
 
-### 🚧 Phase 2: Installation (Coming Soon)
+### ✅ Phase 2: Installation (COMPLETE)
 
-- [ ] Dependency manager
-- [ ] Native installation flow
-- [ ] Docker installation flow
-- [ ] Configuration wizard
-- [ ] Service management
+- [x] Native installation flow
+- [x] Configuration wizard
+- [x] Workspace template generation
+- [x] Multi-instance support (Profexor, Tokyoneon, custom)
+- [x] Identity file generation
+- [ ] Docker installation flow (Coming Soon)
+- [ ] Service management (Coming Soon)
 
 ### 📅 Phase 3: Advanced Features (Planned)
 
@@ -88,21 +90,30 @@ Output as JSON:
 openclaw-easyset detect --json
 ```
 
-### Install OpenClaw (Coming in Phase 2)
+### Install OpenClaw
 
 ```bash
-# Interactive installation
+# Interactive installation (recommended)
 openclaw-easyset install
 
-# Non-interactive with config file
-openclaw-easyset install --config my-setup.json --yes
+# Quick install with defaults
+openclaw-easyset install --yes
 
 # Dry-run to preview changes
-openclaw-easyset install --dry-run --verbose
+openclaw-easyset install --dry-run
 
-# Docker installation
+# Force install (skip requirements check)
+openclaw-easyset install --force
+
+# Docker installation (coming soon)
 openclaw-easyset install --mode docker
 ```
+
+**Supported Instances:**
+- `profexor` 🦾 - Personal assistant (macOS, iMessage + NDIS coordination)
+- `tokyoneon` 🌃 - Development engine (Windows, GPU + coding focus)
+- `forge` 🔥 - Build automation (any platform)
+- Custom - Create your own identity
 
 ### Check Status (Coming in Phase 2)
 
